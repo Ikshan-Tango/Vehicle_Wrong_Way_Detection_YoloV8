@@ -1,5 +1,5 @@
 import math
-
+import time
 
 class Tracker:
     def __init__(self):
@@ -13,6 +13,7 @@ class Tracker:
     def update(self, objects_rect):
         # Objects boxes and ids
         objects_bbs_ids = []
+        timestamp = time.time()
 
         # Get center point of new object
         for rect in objects_rect:
@@ -28,20 +29,20 @@ class Tracker:
                 if dist < 35:
                     self.center_points[id] = (cx, cy)
 #                    print(self.center_points)
-                    objects_bbs_ids.append([x, y, w, h, id])
+                    objects_bbs_ids.append([x, y, w, h, id, timestamp])
                     same_object_detected = True
                     break
 
             # New object is detected we assign the ID to that object
             if same_object_detected is False:
                 self.center_points[self.id_count] = (cx, cy)
-                objects_bbs_ids.append([x, y, w, h, self.id_count])
+                objects_bbs_ids.append([x, y, w, h, self.id_count, timestamp])
                 self.id_count += 1
 
         # Clean the dictionary by center points to remove IDS not used anymore
         new_center_points = {}
         for obj_bb_id in objects_bbs_ids:
-            _, _, _, _, object_id = obj_bb_id
+            _, _, _, _, object_id, tstamp = obj_bb_id
             center = self.center_points[object_id]
             new_center_points[object_id] = center
 

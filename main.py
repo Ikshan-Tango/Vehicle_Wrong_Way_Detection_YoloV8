@@ -1,4 +1,5 @@
 import cv2
+import math
 import pandas as pd
 from ultralytics import YOLO
 from tracker import Tracker
@@ -18,7 +19,8 @@ def RGB(event, x, y, flags, param):
 cv2.namedWindow('RGB')
 cv2.setMouseCallback('RGB', RGB)
 
-cap=cv2.VideoCapture('wrongway.mp4')
+cap=cv2.VideoCapture('traffic_analysis.mov')
+# cap=cv2.VideoCapture('wrongway.mp4')
 
 
 my_file = open("coco.txt", "r")
@@ -32,6 +34,9 @@ area1=[(593,227),(602,279),(785,274),(774,220)]
 area2=[(747,92),(785,208),(823,202),(773,95)]
 wup={}
 wrongway=[]
+prev_box = []
+
+fps = cap.get(cv2.CAP_PROP_FPS)
 
 while True:    
     ret,frame = cap.read()
@@ -66,18 +71,30 @@ while True:
             list.append([x1,y1,x2,y2])
 
     bbox_idx=tracker.update(list)
-    
-    for bbox in bbox_idx:
-        x3,y3,x4,y4,id=bbox
+    if len(prev_box) == 0:
+        prev_box = bbox_idx
+    for bbox, prv_box in zip(bbox_idx, prev_box):
+        x3,y3,x4,y4,id,cur_times=bbox
+        px3,py3,px4,py4,id,prev_time=prv_box
+        speed = 0
+        dist = math.sqrt((x4 - px4)**2 + (y4 - py4)**2)
+        if cur_times != prev_time and dist != 0:
+            time = (cur_times - prev_time)
+            speed = (dist)/(time)
+        print("points->", bbox, prev_box)
         cx=x3
         cy=y4
         # Marking the bottom left corner of the bounding box
         is_car_in_area1 = cv2.pointPolygonTest(np.array(area1, np.int32), ((cx, cy)), False)
-        # print(is_car_in_area1) 
+        # print(is_car_in_area1)
 
         # Store the ID's of the cars moving from area 1 
         if(is_car_in_area1 >= 0):
             wup[id] = (cx, cy)
+
+        if speed != 0:
+            cv2.rectangle(frame,(x3,y3),(x4,y4),(255,0,255),2)
+            cvzone.putTextRect(frame,f'Speed: {speed}',(x3,y3),1,1)
 
         # Checking for the same car if it ever goes to area 2
         if id in wup:
@@ -85,7 +102,7 @@ while True:
             if is_car_in_area2 >= 0:
 
                 cv2.circle(frame,(cx,cy),8,(255,0,0),-1)
-                cv2.rectangle(frame,(x3,y3),(x4,y4),(255,0,255),2)
+                cv2.rectangle(frame,(x3,y3),(x4,y4),(255,0,0),2)
                 cvzone.putTextRect(frame,f'{id}',(x3,y3),1,1)
 
                 if id in wrongway:
@@ -95,6 +112,7 @@ while True:
                     print(f"Car {id} is going in the wrong way")
         
     print(wup)
+    prev_box = bbox_idx
 
     total_wrongway_cars = len(wrongway)
 
@@ -102,7 +120,7 @@ while True:
     cv2.polylines(frame,[np.array(area2,np.int32)],True,(255,255,255),2) 
     cv2.putText(frame, f"Wrongway cars: {total_wrongway_cars}", (10, 50), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 255), 2)
     cv2.imshow("RGB", frame)
-    if cv2.waitKey(0)&0xFF==27:
+    if cv2.waitKey(int(1000 / fps))&0xFF==ord('q'):
         break
 cap.release()
 cv2.destroyAllWindows()
